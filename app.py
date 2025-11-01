@@ -1,110 +1,83 @@
 import streamlit as st
 import yfinance as yf
 import pandas as pd
-import numpy as np
 import time
-import requests
 
-st.set_page_config(page_title="Analizador Bolsa USA", layout="wide", page_icon="💹")
+# 🌙 Configuración de la app
+st.set_page_config(page_title="Analizador Bolsa USA", page_icon="💹", layout="wide")
 
-st.title("💹 Analizador Bolsa USA — en tiempo real")
-st.markdown("### Señales automáticas de **COMPRA / VENTA** (MA + RSI) con criptos desde CoinGecko")
+st.title("💹 Analizador de Bolsa USA y Criptomonedas")
+st.markdown("Visualiza precios en tiempo real, tendencias y señales de compra o venta.")
 
-# --- Barra lateral ---
-st.sidebar.header("⚙️ Configuración")
-intervalo = st.sidebar.selectbox("Intervalo de actualización", ["1m", "5m", "15m", "30m", "1h", "1d"], index=2)
-actualizar = st.sidebar.slider("⏱️ Actualizar cada (segundos):", 10, 300, 60, step=10)
-
-# --- Lista de activos ---
-st.sidebar.subheader("📈 Selecciona empresas o criptomonedas")
+# 🏢 Lista de empresas y criptos
 opciones = {
-    "AAPL": "Apple",
-    "MSFT": "Microsoft",
-    "GOOGL": "Google",
-    "AMZN": "Amazon",
-    "TSLA": "Tesla",
-    "META": "Meta",
-    "NVDA": "NVIDIA",
-    "BTC": "Bitcoin",
-    "ETH": "Ethereum"
+    "Acciones": ["AAPL", "MSFT", "GOOGL", "AMZN", "META", "NVDA", "TSLA", "JPM", "V", "WMT"],
+    "Criptomonedas": ["BTC-USD", "ETH-USD", "DOGE-USD", "SOL-USD"]
 }
-seleccion = st.sidebar.multiselect("Activos a analizar", options=list(opciones.keys()), default=["AAPL", "TSLA", "BTC"])
 
-# --- Función para RSI ---
-def calcular_RSI(data, periodos=14):
-    delta = data["Close"].diff()
-    ganancia = delta.where(delta > 0, 0)
-    perdida = -delta.where(delta < 0, 0)
-    media_ganancia = ganancia.rolling(periodos).mean()
-    media_perdida = perdida.rolling(periodos).mean()
-    RS = media_ganancia / media_perdida
-    RSI = 100 - (100 / (1 + RS))
-    return RSI
+# 🎯 Selección múltiple
+st.sidebar.header("Configuración")
+seleccion = st.sidebar.multiselect(
+    "Elige empresas o criptos:",
+    opciones["Acciones"] + opciones["Criptomonedas"],
+    default=["AAPL", "BTC-USD"]
+)
 
-# --- Función para datos de CoinGecko ---
-def obtener_datos_coingecko(cripto_id):
+intervalo = st.sidebar.slider("⏱️ Intervalo de actualización (segundos)", 5, 120, 30)
+
+# 📈 Función para obtener datos
+def obtener_datos(simbolo):
     try:
-        url = f"https://api.coingecko.com/api/v3/coins/{cripto_id}/market_chart?vs_currency=usd&days=5&interval=hourly"
-        r = requests.get(url, timeout=10)
-        data = r.json()
-        precios = pd.DataFrame(data["prices"], columns=["Time", "Close"])
-        precios["Time"] = pd.to_datetime(precios["Time"], unit='ms')
-        precios.set_index("Time", inplace=True)
-        return precios
+        data = yf.download(simbolo, period="5d", interval="1h")
+        if data.empty:
+            st.warning(f"No hay datos disponibles para {simbolo}.")
+            return None
+        data["RSI"] = calcular_RSI(data["Close"])
+        data["MA20"] = data["Close"].rolling(window=20).mean()
+        return data
     except Exception as e:
-        st.warning(f"⚠️ No se pudieron obtener datos de {cripto_id}: {e}")
+        st.error(f"Error al obtener datos de {simbolo}: {e}")
         return None
 
-# --- Análisis principal ---
-for simbolo in seleccion:
-    st.markdown(f"## {opciones[simbolo]} ({simbolo})")
-    try:
-        if simbolo in ["BTC", "ETH"]:
-            # Obtener datos de CoinGecko
-            cripto_id = "bitcoin" if simbolo == "BTC" else "ethereum"
-            data = obtener_datos_coingecko(cripto_id)
-        else:
-            # Obtener datos de Yahoo Finance
-            data = yf.download(simbolo, period="5d", interval=intervalo, progress=False)
+# 📊 RSI (Índice de Fuerza Relativa)
+def calcular_RSI(series, periodo=14):
+    delta = series.diff()
+    ganancia = delta.where(delta > 0, 0)
+    perdida = -delta.where(delta < 0, 0)
+    promedio_gan = ganancia.rolling(periodo).mean()
+    promedio_perd = perdida.rolling(periodo).mean()
+    rs = promedio_gan / promedio_perd
+    return 100 - (100 / (1 + rs))
 
-        if data is None or data.empty:
-            st.warning(f"⚠️ No hay datos disponibles para {simbolo}")
-            st.divider()
-            continue
+# 🚦 Señales de compra/venta
+def generar_senal(data):
+    if data is None or len(data) < 20:
+        return "⚪ Sin datos"
+    rsi = data["RSI"].iloc[-1]
+    close = data["Close"].iloc[-1]
+    ma20 = data["MA20"].iloc[-1]
+    if rsi < 30 and close > ma20:
+        return "🟢 Compra"
+    elif rsi > 70 and close < ma20:
+        return "🔴 Venta"
+    else:
+        return "⚪ Mantener"
 
-        # Calcular indicadores
-        data["MA20"] = data["Close"].rolling(20).mean()
-        data["MA50"] = data["Close"].rolling(50).mean()
-        data["RSI"] = calcular_RSI(data)
+# 🔁 Actualización automática
+while True:
+    for simbolo in seleccion:
+        st.subheader(f"{simbolo}")
+        data = obtener_datos(simbolo)
+        if data is not None:
+            precio = data["Close"].iloc[-1]
+            variacion = (precio - data["Open"].iloc[-1]) / data["Open"].iloc[-1] * 100
+            st.write(f"💰 **Precio actual:** ${precio:.2f}")
+            st.write(f"📊 **Variación del día:** {variacion:.2f}%")
+            st.write(f"📈 **Señal:** {generar_senal(data)}")
 
-        precio = data["Close"].iloc[-1]
-        ma20 = data["MA20"].iloc[-1]
-        ma50 = data["MA50"].iloc[-1]
-        rsi = data["RSI"].iloc[-1]
+            st.line_chart(data["Close"])
+        st.markdown("---")
 
-        # Señales combinadas
-        if ma20 > ma50 and rsi < 60:
-            señal = "🟢 COMPRA"
-            color = "green"
-        elif ma20 < ma50 and rsi > 50:
-            señal = "🔴 VENTA"
-            color = "red"
-        else:
-            señal = "⚪ NEUTRAL"
-            color = "gray"
-
-        st.markdown(f"💰 **Precio actual:** ${precio:,.2f}")
-        st.markdown(f"📊 **MA20:** {ma20:,.2f} | **MA50:** {ma50:,.2f}")
-        st.markdown(f"📉 **RSI:** {rsi:.2f}")
-        st.markdown(f"### <span style='color:{color}'>{señal}</span>", unsafe_allow_html=True)
-        st.line_chart(data[["Close", "MA20", "MA50"]])
-        st.divider()
-
-    except Exception as e:
-        st.warning(f"⚠️ Error al procesar {simbolo}: {e}")
-        st.divider()
-
-# --- Auto-actualización ---
-st.toast("🔄 Actualizando datos automáticamente…")
-time.sleep(actualizar)
-st.rerun()
+    st.info(f"⏳ Actualizando datos cada {intervalo} segundos...")
+    time.sleep(intervalo)
+    st.rerun()
