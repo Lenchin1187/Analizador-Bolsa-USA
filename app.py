@@ -63,31 +63,28 @@ def generar_senal(data):
     else:
         return "⚪ Mantener"
 
-# 🔁 Actualización automática
+# 🔁 Bucle principal
 while True:
     for simbolo in seleccion:
         st.subheader(f"{simbolo}")
         data = obtener_datos(simbolo)
-        for simbolo in seleccion:
-    st.subheader(f"{simbolo}")
-    data = obtener_datos(simbolo)
 
-    if data is not None and not data.empty:
-        precio = data["Close"].iloc[-1]
-        apertura = data["Open"].iloc[-1]
-        variacion = ((precio - apertura) / apertura) * 100
-        senal = generar_senal(data)
+        if data is not None and not data.empty:
+            precio = data["Close"].iloc[-1]
+            apertura = data["Open"].iloc[-1]
+            variacion = ((precio - apertura) / apertura) * 100
+            senal = generar_senal(data)
 
-        st.write(f"💰 **Precio actual:** ${precio:.2f}")
-        st.write(f"📊 **Variación del día:** {variacion:.2f}%")
-        st.write(f"📈 **Señal:** {senal}")
+            st.write(f"💰 **Precio actual:** ${precio:.2f}")
+            st.write(f"📊 **Variación del día:** {variacion:.2f}%")
+            st.write(f"📈 **Señal:** {senal}")
 
-        st.line_chart(data["Close"])
-    else:
-        st.warning(f"⚠️ No se pudieron obtener datos para {simbolo}.")
+            st.line_chart(data["Close"])
+        else:
+            st.warning(f"⚠️ No se pudieron obtener datos para {simbolo}.")
 
-    st.markdown("---")
+        st.markdown("---")
 
-st.info(f"⏳ Actualizando datos cada {intervalo} segundos...")
-time.sleep(intervalo)
-st.rerun()
+    st.info(f"⏳ Actualizando datos cada {intervalo} segundos...")
+    time.sleep(intervalo)
+    st.rerun()
