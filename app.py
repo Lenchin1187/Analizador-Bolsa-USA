@@ -71,6 +71,7 @@ while True:
         for simbolo in seleccion:
     st.subheader(f"{simbolo}")
     data = obtener_datos(simbolo)
+
     if data is not None and not data.empty:
         precio = data["Close"].iloc[-1]
         apertura = data["Open"].iloc[-1]
@@ -86,3 +87,7 @@ while True:
         st.warning(f"⚠️ No se pudieron obtener datos para {simbolo}.")
 
     st.markdown("---")
+
+st.info(f"⏳ Actualizando datos cada {intervalo} segundos...")
+time.sleep(intervalo)
+st.rerun()
