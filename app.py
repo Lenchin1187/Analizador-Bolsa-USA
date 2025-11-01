@@ -68,16 +68,21 @@ while True:
     for simbolo in seleccion:
         st.subheader(f"{simbolo}")
         data = obtener_datos(simbolo)
-        if data is not None:
-            precio = data["Close"].iloc[-1]
-            variacion = (precio - data["Open"].iloc[-1]) / data["Open"].iloc[-1] * 100
-            st.write(f"💰 **Precio actual:** ${precio:.2f}")
-            st.write(f"📊 **Variación del día:** {variacion:.2f}%")
-            st.write(f"📈 **Señal:** {generar_senal(data)}")
+        for simbolo in seleccion:
+    st.subheader(f"{simbolo}")
+    data = obtener_datos(simbolo)
+    if data is not None and not data.empty:
+        precio = data["Close"].iloc[-1]
+        apertura = data["Open"].iloc[-1]
+        variacion = ((precio - apertura) / apertura) * 100
+        senal = generar_senal(data)
 
-            st.line_chart(data["Close"])
-        st.markdown("---")
+        st.write(f"💰 **Precio actual:** ${precio:.2f}")
+        st.write(f"📊 **Variación del día:** {variacion:.2f}%")
+        st.write(f"📈 **Señal:** {senal}")
 
-    st.info(f"⏳ Actualizando datos cada {intervalo} segundos...")
-    time.sleep(intervalo)
-    st.rerun()
+        st.line_chart(data["Close"])
+    else:
+        st.warning(f"⚠️ No se pudieron obtener datos para {simbolo}.")
+
+    st.markdown("---")
