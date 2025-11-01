@@ -64,32 +64,43 @@ def generar_senal(data):
 resumen = []
 
 # 🔁 Análisis de cada activo
+
 for simbolo in seleccion:
     st.subheader(f"{simbolo}")
     data = obtener_datos(simbolo)
 
-    if data is not None and not data.empty:
-        precio = data["Close"].iloc[-1]
-        apertura = data["Open"].iloc[-1]
-        variacion = ((precio - apertura) / apertura) * 100
-        senal = generar_senal(data)
-        rsi = data["RSI"].iloc[-1]
+    try:
+        if data is not None and not data.empty:
+            precio = float(data["Close"].iloc[-1])
+            apertura = float(data["Open"].iloc[-1])
+            variacion = ((precio - apertura) / apertura) * 100
+            senal = generar_senal(data)
+            rsi = float(data["RSI"].iloc[-1])
 
-        st.write(f"💰 **Precio actual:** ${precio:.2f}")
-        st.write(f"📊 **Variación del día:** {variacion:.2f}%")
-        st.write(f"📈 **RSI:** {rsi:.2f}")
-        st.write(f"🚦 **Señal:** {senal}")
-        st.line_chart(data["Close"])
+            st.write(f"💰 **Precio actual:** ${precio:.2f}")
+            st.write(f"📊 **Variación del día:** {variacion:.2f}%")
+            st.write(f"📈 **RSI:** {rsi:.2f}")
+            st.write(f"🚦 **Señal:** {senal}")
+            st.line_chart(data["Close"])
 
-        resumen.append({
-            "Símbolo": simbolo,
-            "Precio": f"${precio:.2f}",
-            "RSI": round(rsi, 2),
-            "Variación (%)": round(variacion, 2),
-            "Señal": senal
-        })
-    else:
-        st.warning(f"⚠️ No se pudieron obtener datos para {simbolo}.")
+            resumen.append({
+                "Símbolo": simbolo,
+                "Precio": f"${precio:.2f}",
+                "RSI": round(rsi, 2),
+                "Variación (%)": round(variacion, 2),
+                "Señal": senal
+            })
+        else:
+            st.warning(f"⚠️ No se pudieron obtener datos para {simbolo}.")
+            resumen.append({
+                "Símbolo": simbolo,
+                "Precio": "N/D",
+                "RSI": "N/D",
+                "Variación (%)": "N/D",
+                "Señal": "⚪ Sin datos"
+            })
+    except Exception as e:
+        st.error(f"⚠️ Error al procesar {simbolo}: {e}")
         resumen.append({
             "Símbolo": simbolo,
             "Precio": "N/D",
