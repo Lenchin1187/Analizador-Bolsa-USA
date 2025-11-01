@@ -1,7 +1,6 @@
 import streamlit as st
 import yfinance as yf
 import pandas as pd
-import time
 
 # 🌙 Configuración de la app
 st.set_page_config(page_title="Analizador Bolsa USA", page_icon="💹", layout="wide")
@@ -28,15 +27,13 @@ intervalo = st.sidebar.slider("⏱️ Intervalo de actualización (segundos)", 5
 # 📈 Función para obtener datos
 def obtener_datos(simbolo):
     try:
-        data = yf.download(simbolo, period="5d", interval="1h")
-        if data.empty:
-            st.warning(f"No hay datos disponibles para {simbolo}.")
+        data = yf.download(simbolo, period="5d", interval="1h", progress=False)
+        if data is None or data.empty:
             return None
         data["RSI"] = calcular_RSI(data["Close"])
         data["MA20"] = data["Close"].rolling(window=20).mean()
         return data
-    except Exception as e:
-        st.error(f"Error al obtener datos de {simbolo}: {e}")
+    except Exception:
         return None
 
 # 📊 RSI (Índice de Fuerza Relativa)
@@ -63,28 +60,50 @@ def generar_senal(data):
     else:
         return "⚪ Mantener"
 
-# 🔁 Bucle principal
-while True:
-    for simbolo in seleccion:
-        st.subheader(f"{simbolo}")
-        data = obtener_datos(simbolo)
+# 📋 Tabla resumen
+resumen = []
 
-        if data is not None and not data.empty:
-            precio = data["Close"].iloc[-1]
-            apertura = data["Open"].iloc[-1]
-            variacion = ((precio - apertura) / apertura) * 100
-            senal = generar_senal(data)
+# 🔁 Análisis de cada activo
+for simbolo in seleccion:
+    st.subheader(f"{simbolo}")
+    data = obtener_datos(simbolo)
 
-            st.write(f"💰 **Precio actual:** ${precio:.2f}")
-            st.write(f"📊 **Variación del día:** {variacion:.2f}%")
-            st.write(f"📈 **Señal:** {senal}")
+    if data is not None and not data.empty:
+        precio = data["Close"].iloc[-1]
+        apertura = data["Open"].iloc[-1]
+        variacion = ((precio - apertura) / apertura) * 100
+        senal = generar_senal(data)
+        rsi = data["RSI"].iloc[-1]
 
-            st.line_chart(data["Close"])
-        else:
-            st.warning(f"⚠️ No se pudieron obtener datos para {simbolo}.")
+        st.write(f"💰 **Precio actual:** ${precio:.2f}")
+        st.write(f"📊 **Variación del día:** {variacion:.2f}%")
+        st.write(f"📈 **RSI:** {rsi:.2f}")
+        st.write(f"🚦 **Señal:** {senal}")
+        st.line_chart(data["Close"])
 
-        st.markdown("---")
+        resumen.append({
+            "Símbolo": simbolo,
+            "Precio": f"${precio:.2f}",
+            "RSI": round(rsi, 2),
+            "Variación (%)": round(variacion, 2),
+            "Señal": senal
+        })
+    else:
+        st.warning(f"⚠️ No se pudieron obtener datos para {simbolo}.")
+        resumen.append({
+            "Símbolo": simbolo,
+            "Precio": "N/D",
+            "RSI": "N/D",
+            "Variación (%)": "N/D",
+            "Señal": "⚪ Sin datos"
+        })
 
-    st.info(f"⏳ Actualizando datos cada {intervalo} segundos...")
-    time.sleep(intervalo)
-    st.rerun()
+    st.markdown("---")
+
+# 📊 Mostrar tabla resumen
+if resumen:
+    st.subheader("📋 Resumen General")
+    df = pd.DataFrame(resumen)
+    st.dataframe(df, use_container_width=True)
+
+st.info(f"✅ Datos cargados correctamente. Actualiza con **Ctrl+R** o usa el botón de recarga de la app.")
